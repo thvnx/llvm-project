@@ -2474,6 +2474,9 @@ public:
 // SVE Types
 #define SVE_TYPE(Name, Id, SingletonId) Id,
 #include "clang/Basic/AArch64SVEACLETypes.def"
+// KVX TCA Types
+#define KVX_TCA_VECTOR_TYPE(Name, Id, Size) Id,
+#include "clang/Basic/KVXTypes.def"
 // All other builtin types
 #define BUILTIN_TYPE(Id, SingletonId) Id,
 #define LAST_BUILTIN_TYPE(Id) LastKind = Id

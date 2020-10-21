@@ -728,6 +728,9 @@ void USRGenerator::VisitType(QualType T) {
 #define SVE_TYPE(Name, Id, SingletonId) \
         case BuiltinType::Id:
 #include "clang/Basic/AArch64SVEACLETypes.def"
+#define KVX_TCA_VECTOR_TYPE(Name, Id, Size) \
+        case BuiltinType::Id:
+#include "clang/Basic/KVXTypes.def"
         case BuiltinType::ShortAccum:
         case BuiltinType::Accum:
         case BuiltinType::LongAccum:

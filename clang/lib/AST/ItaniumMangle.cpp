@@ -2726,6 +2726,12 @@ void CXXNameMangler::mangleType(const BuiltinType *T) {
     Out << 'u' << type_name.size() << type_name; \
     break;
 #include "clang/Basic/AArch64SVEACLETypes.def"
+#define KVX_TCA_VECTOR_TYPE(Name, Id, Size) \
+  case BuiltinType::Id: \
+    type_name = #Name; \
+    Out << 'u' << type_name.size() << type_name; \
+    break;
+#include "clang/Basic/KVXTypes.def"
   }
 }
 

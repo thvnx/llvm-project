@@ -1024,6 +1024,9 @@ namespace serialization {
       // \brief SVE types with auto numeration
 #define SVE_TYPE(Name, Id, SingletonId) PREDEF_TYPE_##Id##_ID,
 #include "clang/Basic/AArch64SVEACLETypes.def"
+    // \brief  KVX TCA types with auto numeration
+#define KVX_TCA_VECTOR_TYPE(Name, Id, Size) PREDEF_TYPE_##Id##_ID,
+#include "clang/Basic/KVXTypes.def"
     };
 
     /// The number of predefined type IDs that are reserved for

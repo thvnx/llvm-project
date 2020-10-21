@@ -527,6 +527,12 @@ llvm::Type *CodeGenTypes::ConvertType(QualType T) {
       ResultType = llvm::IntegerType::get(getLLVMContext(), 32);
       break;
     }
+#define KVX_TCA_VECTOR_TYPE(Name, Id, Size) \
+    case BuiltinType::Id: \
+      ResultType = \
+        llvm::VectorType::get(ConvertType(Context.BoolTy), Size); \
+      break;
+#include "clang/Basic/KVXTypes.def"
 
     case BuiltinType::Dependent:
 #define BUILTIN_TYPE(Id, SingletonId)

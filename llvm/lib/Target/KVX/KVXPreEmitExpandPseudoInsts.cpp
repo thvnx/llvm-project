@@ -343,8 +343,8 @@ static bool expandALOAD(unsigned int Opcode, const KVXInstrInfo *TII,
   //   copy $output = $fetch
 
   Register UpdateFetch = MI.getOperand(1).getReg();
-  Register Update = TRI->getSubReg(UpdateFetch, 1);
-  Register Fetch = TRI->getSubReg(UpdateFetch, 2);
+  Register Update = TRI->getSubReg(UpdateFetch, KVX::sub_s0);
+  Register Fetch = TRI->getSubReg(UpdateFetch, KVX::sub_s1);
 
   unsigned COPY = MOSize == 4 ? KVX::COPYW : KVX::COPYD;
   unsigned LOAD = getLOADOpcode(MOSize, Offset);
@@ -444,8 +444,8 @@ static bool expandATAS(const KVXInstrInfo *TII, MachineBasicBlock &MBB,
   Register Value = MI.getOperand(7).getReg();
 
   Register UpdateFetch = MI.getOperand(1).getReg();
-  Register Update = TRI->getSubReg(UpdateFetch, 1);
-  Register Fetch = TRI->getSubReg(UpdateFetch, 2);
+  Register Update = TRI->getSubReg(UpdateFetch, KVX::sub_s0);
+  Register Fetch = TRI->getSubReg(UpdateFetch, KVX::sub_s1);
 
   Register Pos = MI.getOperand(2).getReg();
   Register Mask = MI.getOperand(3).getReg();
@@ -587,8 +587,8 @@ static bool expandACMPSWAP(const KVXInstrInfo *TII, MachineBasicBlock &MBB,
   Register Swap = MI.getOperand(5).getReg();
 
   Register DesiredExpected = MI.getOperand(1).getReg();
-  Register Desired = TRI->getSubReg(DesiredExpected, 1);
-  Register Expected = TRI->getSubReg(DesiredExpected, 2);
+  Register Desired = TRI->getSubReg(DesiredExpected, KVX::sub_s0);
+  Register Expected = TRI->getSubReg(DesiredExpected, KVX::sub_s1);
 
   //   copy $expected = $compare                  # iff $compare isn't a valid
   //                                              #   PairedReg subreg
@@ -725,14 +725,14 @@ static bool expandRoundingPairInstrOpcodes(unsigned int OpCode1,
   unsigned v2Reg = MI.getOperand(2).getReg();
   int64_t rounding = MI.getOperand(3).getImm();
 
-  BuildMI(MBB, MBBI, DL, TII->get(OpCode1), TRI->getSubReg(outReg, 1))
-      .addReg(TRI->getSubReg(v1Reg, 1))
-      .addReg(TRI->getSubReg(v2Reg, 1))
+  BuildMI(MBB, MBBI, DL, TII->get(OpCode1), TRI->getSubReg(outReg, KVX::sub_s0))
+      .addReg(TRI->getSubReg(v1Reg, KVX::sub_s0))
+      .addReg(TRI->getSubReg(v2Reg, KVX::sub_s0))
       .addImm(rounding)
       .addImm(KVXMOD::SILENT_);
-  BuildMI(MBB, MBBI, DL, TII->get(OpCode2), TRI->getSubReg(outReg, 2))
-      .addReg(TRI->getSubReg(v1Reg, 2))
-      .addReg(TRI->getSubReg(v2Reg, 2))
+  BuildMI(MBB, MBBI, DL, TII->get(OpCode2), TRI->getSubReg(outReg, KVX::sub_s1))
+      .addReg(TRI->getSubReg(v1Reg, KVX::sub_s1))
+      .addReg(TRI->getSubReg(v2Reg, KVX::sub_s1))
       .addImm(rounding)
       .addImm(KVXMOD::SILENT_);
 
@@ -754,26 +754,30 @@ static bool expandFMULDCInstr(const KVXInstrInfo *TII, MachineBasicBlock &MBB,
   unsigned v2Reg = MI.getOperand(2).getReg();
   int64_t rounding = MI.getOperand(3).getImm();
 
-  BuildMI(MBB, MBBI, DL, TII->get(KVX::FMULDrr), TRI->getSubReg(outReg, 1))
-      .addReg(TRI->getSubReg(v1Reg, 1))
-      .addReg(TRI->getSubReg(v2Reg, 1))
+  BuildMI(MBB, MBBI, DL, TII->get(KVX::FMULDrr),
+          TRI->getSubReg(outReg, KVX::sub_s0))
+      .addReg(TRI->getSubReg(v1Reg, KVX::sub_s0))
+      .addReg(TRI->getSubReg(v2Reg, KVX::sub_s0))
       .addImm(rounding)
       .addImm(KVXMOD::SILENT_);
-  BuildMI(MBB, MBBI, DL, TII->get(KVX::FFMSDrr), TRI->getSubReg(outReg, 1))
-      .addReg(TRI->getSubReg(outReg, 1))
-      .addReg(TRI->getSubReg(v1Reg, 2))
-      .addReg(TRI->getSubReg(v2Reg, 2))
+  BuildMI(MBB, MBBI, DL, TII->get(KVX::FFMSDrr),
+          TRI->getSubReg(outReg, KVX::sub_s0))
+      .addReg(TRI->getSubReg(outReg, KVX::sub_s0))
+      .addReg(TRI->getSubReg(v1Reg, KVX::sub_s1))
+      .addReg(TRI->getSubReg(v2Reg, KVX::sub_s1))
       .addImm(rounding)
       .addImm(KVXMOD::SILENT_);
-  BuildMI(MBB, MBBI, DL, TII->get(KVX::FMULDrr), TRI->getSubReg(outReg, 2))
-      .addReg(TRI->getSubReg(v1Reg, 1))
-      .addReg(TRI->getSubReg(v2Reg, 2))
+  BuildMI(MBB, MBBI, DL, TII->get(KVX::FMULDrr),
+          TRI->getSubReg(outReg, KVX::sub_s1))
+      .addReg(TRI->getSubReg(v1Reg, KVX::sub_s0))
+      .addReg(TRI->getSubReg(v2Reg, KVX::sub_s1))
       .addImm(rounding)
       .addImm(KVXMOD::SILENT_);
-  BuildMI(MBB, MBBI, DL, TII->get(KVX::FFMADrr), TRI->getSubReg(outReg, 2))
-      .addReg(TRI->getSubReg(outReg, 2))
-      .addReg(TRI->getSubReg(v2Reg, 1))
-      .addReg(TRI->getSubReg(v1Reg, 2))
+  BuildMI(MBB, MBBI, DL, TII->get(KVX::FFMADrr),
+          TRI->getSubReg(outReg, KVX::sub_s1))
+      .addReg(TRI->getSubReg(outReg, KVX::sub_s1))
+      .addReg(TRI->getSubReg(v2Reg, KVX::sub_s0))
+      .addReg(TRI->getSubReg(v1Reg, KVX::sub_s1))
       .addImm(rounding)
       .addImm(KVXMOD::SILENT_);
 
@@ -797,29 +801,33 @@ static bool expandFMULCDCInstr(const KVXInstrInfo *TII, MachineBasicBlock &MBB,
   int64_t rounding = MI.getOperand(4).getImm();
 
   BuildMI(MBB, MBBI, DL, TII->get(KVX::FMULDrr), Scratch)
-      .addReg(TRI->getSubReg(v1Reg, 1))
-      .addReg(TRI->getSubReg(v2Reg, 1))
+      .addReg(TRI->getSubReg(v1Reg, KVX::sub_s0))
+      .addReg(TRI->getSubReg(v2Reg, KVX::sub_s0))
       .addImm(rounding)
       .addImm(KVXMOD::SILENT_);
-  BuildMI(MBB, MBBI, DL, TII->get(KVX::COPYD), TRI->getSubReg(outReg, 1))
-      .addReg(TRI->getSubReg(v2Reg, 2));
-  BuildMI(MBB, MBBI, DL, TII->get(KVX::FFMADrr), TRI->getSubReg(outReg, 1))
-      .addReg(TRI->getSubReg(outReg, 1))
+  BuildMI(MBB, MBBI, DL, TII->get(KVX::COPYD),
+          TRI->getSubReg(outReg, KVX::sub_s0))
+      .addReg(TRI->getSubReg(v2Reg, KVX::sub_s1));
+  BuildMI(MBB, MBBI, DL, TII->get(KVX::FFMADrr),
+          TRI->getSubReg(outReg, KVX::sub_s0))
+      .addReg(TRI->getSubReg(outReg, KVX::sub_s0))
       .addReg(Scratch)
-      .addReg(TRI->getSubReg(v1Reg, 2))
+      .addReg(TRI->getSubReg(v1Reg, KVX::sub_s1))
       .addImm(rounding)
       .addImm(KVXMOD::SILENT_);
   BuildMI(MBB, MBBI, DL, TII->get(KVX::FMULDrr), Scratch)
-      .addReg(TRI->getSubReg(v2Reg, 1))
-      .addReg(TRI->getSubReg(v1Reg, 2))
+      .addReg(TRI->getSubReg(v2Reg, KVX::sub_s0))
+      .addReg(TRI->getSubReg(v1Reg, KVX::sub_s1))
       .addImm(rounding)
       .addImm(KVXMOD::SILENT_);
-  BuildMI(MBB, MBBI, DL, TII->get(KVX::COPYD), TRI->getSubReg(outReg, 2))
-      .addReg(TRI->getSubReg(v2Reg, 2));
-  BuildMI(MBB, MBBI, DL, TII->get(KVX::FFMSDrr), TRI->getSubReg(outReg, 2))
-      .addReg(TRI->getSubReg(outReg, 2))
+  BuildMI(MBB, MBBI, DL, TII->get(KVX::COPYD),
+          TRI->getSubReg(outReg, KVX::sub_s1))
+      .addReg(TRI->getSubReg(v2Reg, KVX::sub_s1));
+  BuildMI(MBB, MBBI, DL, TII->get(KVX::FFMSDrr),
+          TRI->getSubReg(outReg, KVX::sub_s1))
+      .addReg(TRI->getSubReg(outReg, KVX::sub_s1))
       .addReg(Scratch)
-      .addReg(TRI->getSubReg(v1Reg, 1))
+      .addReg(TRI->getSubReg(v1Reg, KVX::sub_s0))
       .addImm(rounding)
       .addImm(KVXMOD::SILENT_);
 
@@ -843,17 +851,17 @@ expandRoundingPairedRegInOutInstr(unsigned int OpCode, const KVXInstrInfo *TII,
   unsigned v2Reg = MI.getOperand(2).getReg();
   int64_t rounding = MI.getOperand(4).getImm();
 
-  BuildMI(MBB, MBBI, DL, TII->get(OpCode), TRI->getSubReg(outReg, 1))
-      .addReg(TRI->getSubReg(outReg, 1))
-      .addReg(TRI->getSubReg(v1Reg, 1))
-      .addReg(TRI->getSubReg(v2Reg, 1))
+  BuildMI(MBB, MBBI, DL, TII->get(OpCode), TRI->getSubReg(outReg, KVX::sub_s0))
+      .addReg(TRI->getSubReg(outReg, KVX::sub_s0))
+      .addReg(TRI->getSubReg(v1Reg, KVX::sub_s0))
+      .addReg(TRI->getSubReg(v2Reg, KVX::sub_s0))
       .addImm(rounding)
       .addImm(KVXMOD::SILENT_);
 
-  BuildMI(MBB, MBBI, DL, TII->get(OpCode), TRI->getSubReg(outReg, 2))
-      .addReg(TRI->getSubReg(outReg, 2))
-      .addReg(TRI->getSubReg(v1Reg, 2))
-      .addReg(TRI->getSubReg(v2Reg, 2))
+  BuildMI(MBB, MBBI, DL, TII->get(OpCode), TRI->getSubReg(outReg, KVX::sub_s1))
+      .addReg(TRI->getSubReg(outReg, KVX::sub_s1))
+      .addReg(TRI->getSubReg(v1Reg, KVX::sub_s1))
+      .addReg(TRI->getSubReg(v2Reg, KVX::sub_s1))
       .addImm(rounding)
       .addImm(KVXMOD::SILENT_);
 
@@ -931,7 +939,7 @@ static bool expandWideMatrixLoadsStores(const KVXInstrInfo *TII,
   LLVM_DEBUG(dbgs() << "Creating a " << (IsStore ? "store from" : "load to")
                     << " register: " << TRI->getRegAsmName(InOutReg) << '\n');
 
-  Register VectorReg = TRI->getSubReg(InOutReg, sub_v0);
+  Register VectorReg = TRI->getSubReg(InOutReg, KVX::sub_v0);
   LLVM_DEBUG(dbgs() << "The sub-register at index 1 is #:" << VectorReg << '('
                     << TRI->getRegAsmName(VectorReg) << ").\n");
   int End;
@@ -951,8 +959,6 @@ static bool expandWideMatrixLoadsStores(const KVXInstrInfo *TII,
     LLVM_DEBUG(dbgs() << "Acting in register #:" << VectorReg << '('
                       << TRI->getRegAsmName(VectorReg) << ").\n");
 
-    // TODO: Investigate why this tests fails, might be related
-    // in how we declare our sub-registers.
     if (!TRI->isSubRegister(InOutReg, VectorReg))
       report_fatal_error(
           "Vector register " + TRI->getRegAsmName(VectorReg.id()) +

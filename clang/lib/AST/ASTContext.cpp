@@ -9565,14 +9565,21 @@ static QualType DecodeTypeFromStr(const char *&Str, const ASTContext &Context,
   bool Signed = false, Unsigned = false;
   RequiresICE = false;
 
+  bool IsTargetType = false;
   // Read the prefixed modifiers first.
   bool Done = false;
-  #ifndef NDEBUG
+#ifndef NDEBUG
   bool IsSpecial = false;
-  #endif
+#endif
   while (!Done) {
     switch (*Str++) {
-    default: Done = true; --Str; break;
+    default:
+      Done = true;
+      --Str;
+      break;
+    case 'T':
+      IsTargetType = true;
+      break;
     case 'I':
       RequiresICE = true;
       break;
@@ -9655,173 +9662,181 @@ static QualType DecodeTypeFromStr(const char *&Str, const ASTContext &Context,
   }
 
   QualType Type;
+  if (IsTargetType) {
+    bool Fail = Context.getTargetInfo().DecodeTargetTypeFromStr(
+        Str, Context, AllowTypeModifiers, Type);
+    if (Fail)
+      Error = ASTContext::GE_Missing_type;
+  } else {
+    // Read the base type.
+    switch (*Str++) {
+    default:
+      llvm::errs() << Str << '\n';
+      llvm_unreachable("Unknown builtin type letter!");
+    case 'v':
+      assert(HowLong == 0 && !Signed && !Unsigned &&
+             "Bad modifiers used with 'v'!");
+      Type = Context.VoidTy;
+      break;
+    case 'h':
+      assert(HowLong == 0 && !Signed && !Unsigned &&
+             "Bad modifiers used with 'h'!");
+      Type = Context.HalfTy;
+      break;
+    case 'f':
+      assert(HowLong == 0 && !Signed && !Unsigned &&
+             "Bad modifiers used with 'f'!");
+      Type = Context.FloatTy;
+      break;
+    case 'd':
+      assert(HowLong < 3 && !Signed && !Unsigned &&
+             "Bad modifiers used with 'd'!");
+      if (HowLong == 1)
+        Type = Context.LongDoubleTy;
+      else if (HowLong == 2)
+        Type = Context.Float128Ty;
+      else
+        Type = Context.DoubleTy;
+      break;
+    case 's':
+      assert(HowLong == 0 && "Bad modifiers used with 's'!");
+      if (Unsigned)
+        Type = Context.UnsignedShortTy;
+      else
+        Type = Context.ShortTy;
+      break;
+    case 'i':
+      if (HowLong == 3)
+        Type = Unsigned ? Context.UnsignedInt128Ty : Context.Int128Ty;
+      else if (HowLong == 2)
+        Type = Unsigned ? Context.UnsignedLongLongTy : Context.LongLongTy;
+      else if (HowLong == 1)
+        Type = Unsigned ? Context.UnsignedLongTy : Context.LongTy;
+      else
+        Type = Unsigned ? Context.UnsignedIntTy : Context.IntTy;
+      break;
+    case 'c':
+      assert(HowLong == 0 && "Bad modifiers used with 'c'!");
+      if (Signed)
+        Type = Context.SignedCharTy;
+      else if (Unsigned)
+        Type = Context.UnsignedCharTy;
+      else
+        Type = Context.CharTy;
+      break;
+    case 'b': // boolean
+      assert(HowLong == 0 && !Signed && !Unsigned && "Bad modifiers for 'b'!");
+      Type = Context.BoolTy;
+      break;
+    case 'z':  // size_t.
+      assert(HowLong == 0 && !Signed && !Unsigned && "Bad modifiers for 'z'!");
+      Type = Context.getSizeType();
+      break;
+    case 'w':  // wchar_t.
+      assert(HowLong == 0 && !Signed && !Unsigned && "Bad modifiers for 'w'!");
+      Type = Context.getWideCharType();
+      break;
+    case 'F':
+      Type = Context.getCFConstantStringType();
+      break;
+    case 'G':
+      Type = Context.getObjCIdType();
+      break;
+    case 'H':
+      Type = Context.getObjCSelType();
+      break;
+    case 'M':
+      Type = Context.getObjCSuperType();
+      break;
+    case 'a':
+      Type = Context.getBuiltinVaListType();
+      assert(!Type.isNull() && "builtin va list type not initialized!");
+      break;
+    case 'A':
+      // This is a "reference" to a va_list; however, what exactly
+      // this means depends on how va_list is defined. There are two
+      // different kinds of va_list: ones passed by value, and ones
+      // passed by reference.  An example of a by-value va_list is
+      // x86, where va_list is a char*. An example of by-ref va_list
+      // is x86-64, where va_list is a __va_list_tag[1]. For x86,
+      // we want this argument to be a char*&; for x86-64, we want
+      // it to be a __va_list_tag*.
+      Type = Context.getBuiltinVaListType();
+      assert(!Type.isNull() && "builtin va list type not initialized!");
+      if (Type->isArrayType())
+        Type = Context.getArrayDecayedType(Type);
+      else
+        Type = Context.getLValueReferenceType(Type);
+      break;
+    case 'V': {
+      char *End;
+      unsigned NumElements = strtoul(Str, &End, 10);
+      assert(End != Str && "Missing vector size");
+      Str = End;
 
-  // Read the base type.
-  switch (*Str++) {
-  default: llvm_unreachable("Unknown builtin type letter!");
-  case 'v':
-    assert(HowLong == 0 && !Signed && !Unsigned &&
-           "Bad modifiers used with 'v'!");
-    Type = Context.VoidTy;
-    break;
-  case 'h':
-    assert(HowLong == 0 && !Signed && !Unsigned &&
-           "Bad modifiers used with 'h'!");
-    Type = Context.HalfTy;
-    break;
-  case 'f':
-    assert(HowLong == 0 && !Signed && !Unsigned &&
-           "Bad modifiers used with 'f'!");
-    Type = Context.FloatTy;
-    break;
-  case 'd':
-    assert(HowLong < 3 && !Signed && !Unsigned &&
-           "Bad modifiers used with 'd'!");
-    if (HowLong == 1)
-      Type = Context.LongDoubleTy;
-    else if (HowLong == 2)
-      Type = Context.Float128Ty;
-    else
-      Type = Context.DoubleTy;
-    break;
-  case 's':
-    assert(HowLong == 0 && "Bad modifiers used with 's'!");
-    if (Unsigned)
-      Type = Context.UnsignedShortTy;
-    else
-      Type = Context.ShortTy;
-    break;
-  case 'i':
-    if (HowLong == 3)
-      Type = Unsigned ? Context.UnsignedInt128Ty : Context.Int128Ty;
-    else if (HowLong == 2)
-      Type = Unsigned ? Context.UnsignedLongLongTy : Context.LongLongTy;
-    else if (HowLong == 1)
-      Type = Unsigned ? Context.UnsignedLongTy : Context.LongTy;
-    else
-      Type = Unsigned ? Context.UnsignedIntTy : Context.IntTy;
-    break;
-  case 'c':
-    assert(HowLong == 0 && "Bad modifiers used with 'c'!");
-    if (Signed)
-      Type = Context.SignedCharTy;
-    else if (Unsigned)
-      Type = Context.UnsignedCharTy;
-    else
-      Type = Context.CharTy;
-    break;
-  case 'b': // boolean
-    assert(HowLong == 0 && !Signed && !Unsigned && "Bad modifiers for 'b'!");
-    Type = Context.BoolTy;
-    break;
-  case 'z':  // size_t.
-    assert(HowLong == 0 && !Signed && !Unsigned && "Bad modifiers for 'z'!");
-    Type = Context.getSizeType();
-    break;
-  case 'w':  // wchar_t.
-    assert(HowLong == 0 && !Signed && !Unsigned && "Bad modifiers for 'w'!");
-    Type = Context.getWideCharType();
-    break;
-  case 'F':
-    Type = Context.getCFConstantStringType();
-    break;
-  case 'G':
-    Type = Context.getObjCIdType();
-    break;
-  case 'H':
-    Type = Context.getObjCSelType();
-    break;
-  case 'M':
-    Type = Context.getObjCSuperType();
-    break;
-  case 'a':
-    Type = Context.getBuiltinVaListType();
-    assert(!Type.isNull() && "builtin va list type not initialized!");
-    break;
-  case 'A':
-    // This is a "reference" to a va_list; however, what exactly
-    // this means depends on how va_list is defined. There are two
-    // different kinds of va_list: ones passed by value, and ones
-    // passed by reference.  An example of a by-value va_list is
-    // x86, where va_list is a char*. An example of by-ref va_list
-    // is x86-64, where va_list is a __va_list_tag[1]. For x86,
-    // we want this argument to be a char*&; for x86-64, we want
-    // it to be a __va_list_tag*.
-    Type = Context.getBuiltinVaListType();
-    assert(!Type.isNull() && "builtin va list type not initialized!");
-    if (Type->isArrayType())
-      Type = Context.getArrayDecayedType(Type);
-    else
-      Type = Context.getLValueReferenceType(Type);
-    break;
-  case 'V': {
-    char *End;
-    unsigned NumElements = strtoul(Str, &End, 10);
-    assert(End != Str && "Missing vector size");
-    Str = End;
+      QualType ElementType =
+          DecodeTypeFromStr(Str, Context, Error, RequiresICE, false);
+      assert(!RequiresICE && "Can't require vector ICE");
 
-    QualType ElementType = DecodeTypeFromStr(Str, Context, Error,
-                                             RequiresICE, false);
-    assert(!RequiresICE && "Can't require vector ICE");
-
-    // TODO: No way to make AltiVec vectors in builtins yet.
-    Type = Context.getVectorType(ElementType, NumElements,
-                                 VectorType::GenericVector);
-    break;
-  }
-  case 'E': {
-    char *End;
-
-    unsigned NumElements = strtoul(Str, &End, 10);
-    assert(End != Str && "Missing vector size");
-
-    Str = End;
-
-    QualType ElementType = DecodeTypeFromStr(Str, Context, Error, RequiresICE,
-                                             false);
-    Type = Context.getExtVectorType(ElementType, NumElements);
-    break;
-  }
-  case 'X': {
-    QualType ElementType = DecodeTypeFromStr(Str, Context, Error, RequiresICE,
-                                             false);
-    assert(!RequiresICE && "Can't require complex ICE");
-    Type = Context.getComplexType(ElementType);
-    break;
-  }
-  case 'Y':
-    Type = Context.getPointerDiffType();
-    break;
-  case 'P':
-    Type = Context.getFILEType();
-    if (Type.isNull()) {
-      Error = ASTContext::GE_Missing_stdio;
-      return {};
+      // TODO: No way to make AltiVec vectors in builtins yet.
+      Type = Context.getVectorType(ElementType, NumElements,
+                                   VectorType::GenericVector);
+      break;
     }
-    break;
-  case 'J':
-    if (Signed)
-      Type = Context.getsigjmp_bufType();
-    else
-      Type = Context.getjmp_bufType();
+    case 'E': {
+      char *End;
 
-    if (Type.isNull()) {
-      Error = ASTContext::GE_Missing_setjmp;
-      return {};
-    }
-    break;
-  case 'K':
-    assert(HowLong == 0 && !Signed && !Unsigned && "Bad modifiers for 'K'!");
-    Type = Context.getucontext_tType();
+      unsigned NumElements = strtoul(Str, &End, 10);
+      assert(End != Str && "Missing vector size");
 
-    if (Type.isNull()) {
-      Error = ASTContext::GE_Missing_ucontext;
-      return {};
+      Str = End;
+
+      QualType ElementType =
+          DecodeTypeFromStr(Str, Context, Error, RequiresICE, false);
+      Type = Context.getExtVectorType(ElementType, NumElements);
+      break;
     }
-    break;
-  case 'p':
-    Type = Context.getProcessIDType();
-    break;
+    case 'X': {
+      QualType ElementType =
+          DecodeTypeFromStr(Str, Context, Error, RequiresICE, false);
+      assert(!RequiresICE && "Can't require complex ICE");
+      Type = Context.getComplexType(ElementType);
+      break;
+    }
+    case 'Y':
+      Type = Context.getPointerDiffType();
+      break;
+    case 'P':
+      Type = Context.getFILEType();
+      if (Type.isNull()) {
+        Error = ASTContext::GE_Missing_stdio;
+        return {};
+      }
+      break;
+    case 'J':
+      if (Signed)
+        Type = Context.getsigjmp_bufType();
+      else
+        Type = Context.getjmp_bufType();
+
+      if (Type.isNull()) {
+        Error = ASTContext::GE_Missing_setjmp;
+        return {};
+      }
+      break;
+    case 'K':
+      assert(HowLong == 0 && !Signed && !Unsigned && "Bad modifiers for 'K'!");
+      Type = Context.getucontext_tType();
+
+      if (Type.isNull()) {
+        Error = ASTContext::GE_Missing_ucontext;
+        return {};
+      }
+      break;
+    case 'p':
+      Type = Context.getProcessIDType();
+      break;
+    }
   }
 
   // If there are modifiers and if we're allowed to parse them, go for it.

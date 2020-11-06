@@ -11758,6 +11758,8 @@ private:
                                 int ArgNum, unsigned ExpectedFieldNum,
                                 bool AllowName);
   bool SemaBuiltinARMMemoryTaggingCall(unsigned BuiltinID, CallExpr *TheCall);
+  bool CheckKVXTCAType(QualType Type, SourceLocation TypeLoc);
+
 public:
   enum FormatStringType {
     FST_Scanf,

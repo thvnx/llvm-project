@@ -7841,6 +7841,13 @@ void Sema::CheckVariableDeclarationType(VarDecl *NewVD) {
     NewVD->setInvalidDecl();
     return;
   }
+
+  // KVX TCA non-pointer types are not allowed as non-local variable types.
+  if (Context.getTargetInfo().getTriple().isKVX() && !NewVD->isLocalVarDecl() &&
+      CheckKVXTCAType(T, NewVD->getLocation())) {
+    NewVD->setInvalidDecl();
+    return;
+  }
 }
 
 /// Perform semantic checking on a newly-created variable
@@ -10438,6 +10445,12 @@ bool Sema::CheckFunctionDeclaration(Scope *S, FunctionDecl *NewFD,
   if (CheckMultiVersionFunction(*this, NewFD, Redeclaration, OldDecl,
                                 MergeTypeWithPrevious, Previous))
     return Redeclaration;
+
+  // KVX TCA non-pointer types are not allowed as function return types.
+  if (Context.getTargetInfo().getTriple().isKVX() &&
+      CheckKVXTCAType(NewFD->getReturnType(), NewFD->getLocation())) {
+    NewFD->setInvalidDecl();
+  }
 
   // C++11 [dcl.constexpr]p8:
   //   A constexpr specifier for a non-static member function that is not
@@ -13368,6 +13381,12 @@ ParmVarDecl *Sema::CheckParameter(DeclContext *DC, SourceLocation StartLoc,
       !(getLangOpts().OpenCL &&
         (T->isArrayType() || T.getAddressSpace() == LangAS::opencl_private))) {
     Diag(NameLoc, diag::err_arg_with_address_space);
+    New->setInvalidDecl();
+  }
+
+  // KVX TCA non-pointer types are not allowed as function argument types.
+  if (Context.getTargetInfo().getTriple().isKVX() &&
+      CheckKVXTCAType(New->getOriginalType(), New->getLocation())) {
     New->setInvalidDecl();
   }
 

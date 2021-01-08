@@ -2979,15 +2979,15 @@ void AsmPrinter::EmitBasicBlockStart(const MachineBasicBlock &MBB) {
   // here, because multiple LLVM BB's may have been RAUW'd to this block after
   // the references were generated.
   if (MBB.hasAddressTaken()) {
-    const BasicBlock *BB = MBB.getBasicBlock();
     if (isVerbose())
       OutStreamer->AddComment("Block address taken");
-
-    // MBBs can have their address taken as part of CodeGen without having
-    // their corresponding BB's address taken in IR
-    if (BB->hasAddressTaken())
-      for (MCSymbol *Sym : MMI->getAddrLabelSymbolToEmit(BB))
-        OutStreamer->EmitLabel(Sym);
+    if (const BasicBlock *BB = MBB.getBasicBlock()) {
+      // MBBs can have their address taken as part of CodeGen without having
+      // their corresponding BB's address taken in IR
+      if (BB->hasAddressTaken())
+        for (MCSymbol *Sym : MMI->getAddrLabelSymbolToEmit(BB))
+          OutStreamer->EmitLabel(Sym);
+    }
   }
 
   // Print some verbose block comments.

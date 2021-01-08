@@ -76,6 +76,11 @@ ForceGuardLoopEntry(
   "force-hardware-loop-guard", cl::Hidden, cl::init(false),
   cl::desc("Force generation of loop guard intrinsic"));
 
+// For debugging to identify which loop causes some issue.
+static cl::opt<unsigned>
+    HwLoopLimit("limit-num-hwloops", cl::ReallyHidden, cl::init((unsigned)(-1)),
+                cl::desc("Max number of hwloops generated for a module"));
+
 STATISTIC(NumHWLoops, "Number of loops converted to hardware loops");
 
 #ifndef NDEBUG
@@ -244,6 +249,11 @@ bool HardwareLoops::runOnFunction(Function &F) {
 // Return true if the search should stop, which will be when an inner loop is
 // converted and the parent loop doesn't support containing a hardware loop.
 bool HardwareLoops::TryConvertLoop(Loop *L) {
+// Changes from https://reviews.llvm.org/D83953. Might cause merge-conflicts
+// when merging to llvm 11, be aware.
+  if (NumHWLoops >= HwLoopLimit)
+    return false;
+
   // Process nested loops first.
   for (Loop::iterator I = L->begin(), E = L->end(); I != E; ++I) {
     if (TryConvertLoop(*I)) {
@@ -399,12 +409,19 @@ Value *HardwareLoop::InitLoopCount() {
 
   BasicBlock *BB = L->getLoopPreheader();
   if (UseLoopGuard && BB->getSinglePredecessor() &&
-      cast<BranchInst>(BB->getTerminator())->isUnconditional())
-    BB = BB->getSinglePredecessor();
+      cast<BranchInst>(BB->getTerminator())->isUnconditional()) {
+    BasicBlock *Predecessor = BB->getSinglePredecessor();
+    // If it's not safe to create a while loop then don't force it and create a
+    // do-while loop instead
+    if (!isSafeToExpandAt(ExitCount, Predecessor->getTerminator(), SE))
+      UseLoopGuard = false;
+    else
+      BB = Predecessor;
+  }
 
   if (!isSafeToExpandAt(ExitCount, BB->getTerminator(), SE)) {
-    LLVM_DEBUG(dbgs() << "- Bailing, unsafe to expand ExitCount "
-               << *ExitCount << "\n");
+    LLVM_DEBUG(dbgs() << "- Bailing, unsafe to expand ExitCount " << *ExitCount
+                      << "\n");
     return nullptr;
   }
 
